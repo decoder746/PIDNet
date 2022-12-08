@@ -40,24 +40,82 @@ class Cityscapes(BaseDataset):
 
         self.files = self.read_files()
 
-        self.label_mapping = {-1: ignore_label, 0: ignore_label, 
-                              1: ignore_label, 2: ignore_label, 
-                              3: ignore_label, 4: ignore_label, 
-                              5: ignore_label, 6: ignore_label, 
-                              7: 0, 8: 1, 9: ignore_label, 
-                              10: ignore_label, 11: 2, 12: 3, 
-                              13: 4, 14: ignore_label, 15: ignore_label, 
-                              16: ignore_label, 17: 5, 18: ignore_label, 
-                              19: 6, 20: 7, 21: 8, 22: 9, 23: 10, 24: 11,
-                              25: 12, 26: 13, 27: 14, 28: 15, 
-                              29: ignore_label, 30: ignore_label, 
-                              31: 16, 32: 17, 33: 18}
-        self.class_weights = torch.FloatTensor([0.8373, 0.918, 0.866, 1.0345, 
-                                        1.0166, 0.9969, 0.9754, 1.0489,
-                                        0.8786, 1.0023, 0.9539, 0.9843, 
-                                        1.1116, 0.9037, 1.0865, 1.0955, 
-                                        1.0865, 1.1529, 1.0507]).cuda()
-        
+        # self.label_mapping = {-1: ignore_label, 0: ignore_label, 
+        #                       1: ignore_label, 2: ignore_label, 
+        #                       3: ignore_label, 4: ignore_label, 
+        #                       5: ignore_label, 6: ignore_label, 
+        #                       7: 0, 8: 1, 9: ignore_label, 
+        #                       10: ignore_label, 11: 2, 12: 3, 
+        #                       13: 4, 14: ignore_label, 15: ignore_label, 
+        #                       16: ignore_label, 17: 5, 18: ignore_label, 
+        #                       19: 6, 20: 7, 21: 8, 22: 9, 23: 10, 24: 11,
+        #                       25: 12, 26: 13, 27: 14, 28: 15, 
+        #                       29: ignore_label, 30: ignore_label, 
+        #                       31: 16, 32: 17, 33: 18}
+        self.void_classes = [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30, -1]
+        self.valid_classes = [
+            7,
+            8,
+            11,
+            12,
+            13,
+            17,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            31,
+            32,
+            33,
+        ]
+        self.rugd_map = [0, 8, 9, 9, 9, 9, 23, 10, 23, 10, 9, 12, 12, 18, 18, 22, 12, 5,5,5,5,4,3,7,17,17,8,8,8,8,8,8,16,16,0]
+        self.rugd_mapping = dict(zip(range(35),self.rugd_map))
+        self.rugd_mapping[250] = 0
+
+        #self.void_classes = [ 255]
+        #self.valid_classes = [i for i in range(19)]
+        self.class_names =  [
+          "void",
+          "dirt",
+          "sand",
+          "grass",
+          "tree",
+          "pole",
+          "water",
+          "sky",
+          "vehicle",
+          "container/generic-object",
+          "asphalt",
+          "gravel",
+          "building",
+          "mulch",
+          "rock-bed ",
+          "log",
+          "bicycle",
+          "person",
+          "fence",
+          "bush",
+          "sign",
+          "rock",
+          "bridge",
+          "concrete",
+          "picnic-table"
+        ]
+
+        self.ignore_index = 0
+        self.class_map = dict(zip(self.valid_classes, range(19)))
+        # self.class_weights = torch.FloatTensor([0.8373, 0.918, 0.866, 1.0345, 
+        #                                 1.0166, 0.9969, 0.9754, 1.0489,
+        #                                 0.8786, 1.0023, 0.9539, 0.9843, 
+        #                                 1.1116, 0.9037, 1.0865, 1.0955, 
+        #                                 1.0865, 1.1529, 1.0507]).cuda()
+        self.class_weights = torch.ones([25,], dtype=torch.float64).cuda()
         self.bd_dilate_size = bd_dilate_size
     
     def read_files(self):
@@ -91,6 +149,13 @@ class Cityscapes(BaseDataset):
                 label[temp == k] = v
         return label
 
+    def encode_segmap(self, mask):
+        for _voidc in self.void_classes:
+            mask[mask == _voidc] = self.ignore_index
+        for _validc in self.valid_classes:
+            mask[mask == _validc] = self.rugd_mapping[_validc]
+        return mask
+
     def __getitem__(self, index):
         item = self.files[index]
         name = item["name"]
@@ -106,7 +171,7 @@ class Cityscapes(BaseDataset):
 
         label = cv2.imread(os.path.join(self.root,'cityscapes',item["label"]),
                            cv2.IMREAD_GRAYSCALE)
-        label = self.convert_label(label)
+        label = self.encode_segmap(label)
 
         image, label, edge = self.gen_sample(image, label, 
                                 self.multi_scale, self.flip, edge_size=self.bd_dilate_size)
