@@ -115,7 +115,7 @@ class Cityscapes(BaseDataset):
         #                                 0.8786, 1.0023, 0.9539, 0.9843, 
         #                                 1.1116, 0.9037, 1.0865, 1.0955, 
         #                                 1.0865, 1.1529, 1.0507]).cuda()
-        self.class_weights = torch.ones([25,], dtype=torch.float64).cuda()
+        self.class_weights = torch.ones([25,], dtype=torch.float32).cuda()
         self.bd_dilate_size = bd_dilate_size
     
     def read_files(self):
